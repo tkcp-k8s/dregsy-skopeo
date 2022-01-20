@@ -28,7 +28,7 @@ RUN dregsy || true # no such thing as "--version", nice. thanks.
 
 FROM ubuntu:rolling
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && apt-get -y  install libgpgme11 libassuan0 libdevmapper1.02.1 # those gotta match the build-deps above
+RUN apt-get -y update && apt-get -y  install libgpgme11 libassuan0 libdevmapper1.02.1 ca-certificates curl bash # libs gotta match the build-deps above, plus some utilities
 COPY --from=builder /usr/bin/skopeo /usr/bin/skopeo
 COPY --from=builder /usr/bin/dregsy /usr/bin/dregsy
 # Sanity check
@@ -36,7 +36,6 @@ RUN ldd /usr/bin/skopeo
 #RUN ldd /usr/bin/dregsy # built static, thanks
 RUN /usr/bin/skopeo --version
 RUN dregsy || true # no such thing as "--version", nice. thanks.
-
 
 
 
