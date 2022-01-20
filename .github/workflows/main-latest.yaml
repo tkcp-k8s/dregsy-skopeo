@@ -1,0 +1,69 @@
+name: main-latest
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '30 3 * * *' # Scheduled runs every day at 3:30am UTC
+
+env:
+  # This image's versions, image will be tagged with the combinations (:MAJOR, :MAJOR.MINOR, :MAJOR.MINOR
+  MAJOR: "0"
+  MINOR: "4"
+  PATCH: "1"
+
+  # Dependency versions
+  SKOPEO_VERSION: "1.5.2" # 'v' will be added later
+  DREGSY_VERSION: "0.4.1" # upstream has no "v"
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Docker Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }} # github username or org
+          password: ${{ secrets.GITHUB_TOKEN }}    # github actions builtin token. repo has to have pkg access.
+
+      - name: Prepare
+        id: prep
+        run: |
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+      - name: Build and push
+        id: docker_build
+        continue-on-error: true # don't break on errors, I wanna keep cache
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64 # @TODO: ,linux/arm64
+          pull: true # avoid bitrot with repeated cache hits
+          push: true
+          labels: |
+            org.opencontainers.image.title=${{ github.repository }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.source=${{ github.event.repository.clone_url }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
+          cache-from: type=gha # all-automatic Github Actions caching
+          cache-to: type=gha,mode=max
+          build-args: |
+            SKOPEO_VERSION=v${{env.SKOPEO_VERSION}}
+            DREGSY_VERSION=${{env.DREGSY_VERSION}}
+          tags: ghcr.io/${{ github.repository }}:latest,ghcr.io/${{ github.repository }}:${{env.MAJOR}}.${{env.MINOR}}.${{env.PATCH}},ghcr.io/${{ github.repository }}:${{env.MAJOR}}.${{env.MINOR}},ghcr.io/${{ github.repository }}:${{env.MAJOR}}
